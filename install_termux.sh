@@ -69,18 +69,33 @@ fi
 say "Подготовка каталога модели"
 mkdir -p "$MODEL_DIR"
 
-if [ -s "$MODEL_PATH" ]; then
-    echo "Модель уже загружена: $MODEL_PATH"
+# Проверяем не только наличие файла, но и GGUF header. Это защищает от
+# обрезанной/повреждённой загрузки, которую llama.cpp иначе обнаружит слишком поздно.
+valid_gguf() {
+    [ -s "$MODEL_PATH" ] || return 1
+    [ "$(wc -c < "$MODEL_PATH")" -gt 100000000 ] || return 1
+    [ "$(dd if="$MODEL_PATH" bs=1 count=4 2>/dev/null)" = "GGUF" ] || return 1
+}
+
+if valid_gguf; then
+    echo "Модель найдена и похожа на корректный GGUF: $MODEL_PATH"
 else
+    if [ -e "$MODEL_PATH" ]; then
+        say "Обнаружена неполная или повреждённая модель — начинаем загрузку заново"
+        # Сохраняем старый файл, чтобы его можно было удалить вручную при необходимости,
+        # но не продолжаем curl поверх заведомо повреждённого файла.
+        mv "$MODEL_PATH" "${MODEL_PATH}.broken.$(date +%Y%m%d-%H%M%S)"
+    fi
+
     say "Загрузка Qwen2.5-Coder-3B-Instruct Q4_K_M (~2.1 GB)"
     echo "Не вводите имя модели как команду. Установщик сам скачивает файл."
-    echo "Если загрузка прервётся, повторно запустите этот скрипт."
-    curl -L --fail --retry 3 --retry-delay 3 --continue-at - \
+    echo "При обрыве связи можно повторно запустить этот скрипт."
+    curl -L --fail --retry 5 --retry-delay 3 --continue-at - \
         -o "$MODEL_PATH" \
         "$MODEL_URL"
 fi
 
-test -s "$MODEL_PATH" || fail "Файл модели отсутствует или пустой: $MODEL_PATH"
+valid_gguf || fail "Скачанный файл не похож на полный GGUF. Проверьте интернет и повторите установку."
 
 say "Настройка пути модели"
 python - "$REPO_DIR/agent_system/config.py" "$MODEL_FILE" <<'PY'
@@ -108,7 +123,7 @@ if ! llama-cli \
     -p "Ответь одним словом: готов" \
     >/tmp/qwen_test.out 2>/tmp/qwen_test.err; then
     cat /tmp/qwen_test.err >&2
-    fail "Qwen не запустился. Самая частая причина на телефоне — недостаток RAM или неподходящий GGUF."
+    fail "Qwen не запустился. Если ошибка содержит 'data is not within the file bounds', GGUF повреждён или неполон. Установщик теперь проверяет header и повторяет загрузку."
 fi
 cat /tmp/qwen_test.out
 
