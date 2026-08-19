@@ -68,9 +68,9 @@ cmake --version
 curl --version
 ```
 
-### Шаг 5. Установить llama.cpp
+### Шаг 5. Запустить автоматическую установку
 
-Из каталога `~/Library-` запускайте:
+Из каталога `~/Library-`:
 
 ```bash
 bash ./install_termux.sh
@@ -82,17 +82,19 @@ bash ./install_termux.sh
 1. проверяет llama-cli
 2. при необходимости устанавливает llama-cpp
 3. если llama-cli всё ещё нет — собирает llama.cpp
-4. создаёт каталог ~/models
-5. скачивает Qwen2.5-Coder-3B-Instruct Q4_K_M
-6. сохраняет модель в ~/models
-7. прописывает MODEL_PATH
-8. проверяет запуск модели
-9. проверяет Python-код агентов
+4. создаёт ~/models
+5. проверяет существующую модель
+6. скачивает Qwen2.5-Coder-3B-Instruct Q4_K_M при необходимости
+7. проверяет SHA256 модели
+8. сохраняет модель в ~/models
+9. прописывает MODEL_PATH
+10. запускает тест Qwen
+11. проверяет Python-код агентов
 ```
 
 ### Шаг 6. Где именно будет модель
 
-После установки модель должна находиться **именно здесь**:
+Модель должна находиться **именно здесь**:
 
 ```text
 /data/data/com.termux/files/home/models/qwen2.5-coder-3b-instruct-q4_k_m.gguf
@@ -107,41 +109,41 @@ bash ./install_termux.sh
 Проверка:
 
 ```bash
-mkdir -p ~/models
-ls -lh ~/models/
+ls -lh ~/models/qwen2.5-coder-3b-instruct-q4_k_m.gguf
 ```
 
-Ожидаемый файл:
+Для официального файла Qwen2.5-Coder-3B-Instruct Q4_K_M контрольная SHA256:
 
 ```text
-qwen2.5-coder-3b-instruct-q4_k_m.gguf
+724fb256bec1ff062b2f65e4569e871ad2e95ab2a3989723d1769c54294730b7
 ```
 
-**После создания `~/models` не нужно писать туда `Qwen2.5-Coder-3B-Instruct Q4_K_M`.** Это название модели, не команда.
+Файл около **1.8 GB**, как на скриншоте, не считается корректным автоматически: установщик сверяет SHA256 и при несовпадении скачивает файл заново.
 
-### Шаг 7. Если автоматическая загрузка модели не запускалась
+### Шаг 7. Не вводите название модели как команду
 
-Не удаляйте репозиторий. Выполните:
+Неправильно:
 
 ```bash
-cd ~/Library-
-bash ./install_termux.sh
+Qwen2.5-Coder-3B-Instruct Q4_K_M
 ```
 
-Установщик сам создаст `~/models` и скачает `.gguf`.
+Это **название модели**, а не команда Termux.
 
-Если загрузка была прервана, снова выполните ту же команду. Загрузка продолжается.
+Правильно:
 
-### Шаг 8. Проверить llama-cli
+```bash
+ls -lh ~/models/qwen2.5-coder-3b-instruct-q4_k_m.gguf
+```
+
+### Шаг 8. Проверить llama-cli и Qwen
 
 ```bash
 command -v llama-cli
 llama-cli --version
 ```
 
-### Шаг 9. Проверить модель
-
-После того как файл существует:
+Затем:
 
 ```bash
 llama-cli \
@@ -151,9 +153,9 @@ llama-cli \
   -p "Ответь одним словом: готов"
 ```
 
-Нормальный результат — ответ Qwen.
+Нормальный результат — ответ модели без сообщения `data is not within the file bounds`.
 
-### Шаг 10. Проверить путь, который использует агент
+### Шаг 9. Проверить путь, который использует агент
 
 ```bash
 cd ~/Library-/agent_system
@@ -167,7 +169,7 @@ python -c 'from config import MODEL_PATH; print(MODEL_PATH); print(MODEL_PATH.ex
 True
 ```
 
-### Шаг 11. Проверить Python-агентов
+### Шаг 10. Проверить Python-агентов
 
 ```bash
 cd ~/Library-/agent_system
@@ -176,7 +178,7 @@ python -m py_compile config.py llm.py tools.py agents.py run_agent.py
 
 Если команда ничего не выводит — проверка пройдена.
 
-### Шаг 12. Подготовить игру
+### Шаг 11. Подготовить игру
 
 По умолчанию агент работает в:
 
@@ -196,7 +198,7 @@ ls -la ~/Game
 ~/Library-/agent_system/config.py
 ```
 
-### Шаг 13. Проверить игру без AI
+### Шаг 12. Проверить игру без AI
 
 До запуска агента желательно проверить сам проект:
 
@@ -206,7 +208,7 @@ make
 make test
 ```
 
-### Шаг 14. Запустить систему агентов
+### Шаг 13. Запустить систему агентов
 
 ```bash
 cd ~/Library-/agent_system
@@ -232,7 +234,7 @@ git clone https://github.com/ilnur14evro-code/Library-.git
 cd ~/Library-
 pkg install -y python clang cmake make curl
 bash ./install_termux.sh
-ls -lh ~/models/
+ls -lh ~/models/qwen2.5-coder-3b-instruct-q4_k_m.gguf
 llama-cli --version
 llama-cli -m ~/models/qwen2.5-coder-3b-instruct-q4_k_m.gguf -c 2048 -n 32 -p "Ответь: готов"
 cd ~/Library-/agent_system
@@ -240,26 +242,41 @@ python -m py_compile config.py llm.py tools.py agents.py run_agent.py
 python run_agent.py "Проверь проект игры"
 ```
 
-## Если видите `Qwen2.5-Coder-3B-Instruct: command not found`
+## Если появляется `data is not within the file bounds`
 
-Вы ввели **название модели вместо команды**.
+Это означает, что GGUF повреждён или неполон.
 
-Ничего удалять не нужно. Выполните:
+Проверьте:
 
 ```bash
 cd ~/Library-
 bash ./install_termux.sh
 ```
 
-Затем:
+Текущий установщик сравнивает SHA256 с известной контрольной суммой и не считает файл корректным только по размеру или наличию `GGUF` в заголовке.
+
+### Если в каталоге уже лежит старый неполный файл
+
+Установщик не перезаписывает его вслепую. Он сохраняет повреждённый файл с суффиксом:
+
+```text
+.broken.ГГГГММДД-ЧЧММСС
+```
+
+и скачивает новый.
+
+## Если видите `Qwen2.5-Coder-3B-Instruct: command not found`
+
+Вы ввели **название модели вместо команды**.
+
+Ничего удалять не нужно:
 
 ```bash
-ls -lh ~/models/
+cd ~/Library-
+bash ./install_termux.sh
 ```
 
 ## Если видите `Local model not found`
-
-Проверьте:
 
 ```bash
 ls -lh ~/models/qwen2.5-coder-3b-instruct-q4_k_m.gguf
@@ -270,13 +287,6 @@ ls -lh ~/models/qwen2.5-coder-3b-instruct-q4_k_m.gguf
 ```bash
 cd ~/Library-
 bash ./install_termux.sh
-```
-
-Если файл есть:
-
-```bash
-cd ~/Library-/agent_system
-python -c 'from config import MODEL_PATH; print(MODEL_PATH); print(MODEL_PATH.exists())'
 ```
 
 ## Если видите `llama-cli: command not found`
