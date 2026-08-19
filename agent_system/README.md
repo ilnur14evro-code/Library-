@@ -1,78 +1,164 @@
-# Local Qwen Agent System for Termux
+# Local Qwen 2.5 Agent System for Termux
 
-## 1. Install Termux packages
+Локальная система агентов для Android + Termux. API-ключ не используется. После первоначальной установки пакетов и загрузки GGUF-модели система может работать без облачного API.
+
+## Быстрая установка
+
+### 1. Обновить Termux
+
+Используйте актуальный Termux из F-Droid или GitHub Releases. В Termux выполните:
 
 ```bash
 pkg update -y
 pkg upgrade -y
+```
+
+Если `pkg` сообщает, что зеркало не выбрано или репозиторий недоступен:
+
+```bash
+termux-change-repo
+```
+
+Выберите основной репозиторий Termux и повторите `pkg update -y`.
+
+### 2. Установить зависимости
+
+```bash
 pkg install -y git python clang cmake make
 ```
 
-Check whether llama.cpp is packaged:
+`llama-cpp` является пакетом Termux. Сначала установите его напрямую:
 
 ```bash
-pkg search llama
+pkg install -y llama-cpp
 ```
 
-If `llama-cli` is available, verify:
+Проверка:
 
 ```bash
+command -v llama-cli
 llama-cli --version
 ```
 
-## 2. Prepare the local model
+Если `pkg install llama-cpp` сообщает, что пакет не найден, не переходите сразу к ручной сборке: сначала выполните `termux-change-repo`, затем:
 
-Create a model directory:
+```bash
+pkg update -y
+pkg install -y llama-cpp
+```
+
+Если пакет установлен, но `llama-cli` не запускается, проверьте доступные backend-пакеты:
+
+```bash
+pkg search llama-cpp
+```
+
+Для первого запуска используйте CPU backend. Дополнительные GPU/OpenCL/Vulkan backend-пакеты не обязательны.
+
+### 3. Получить репозиторий
+
+```bash
+cd ~
+git clone https://github.com/ilnur14evro-code/Library-.git
+cd ~/Library-
+```
+
+Если репозиторий уже скачан:
+
+```bash
+cd ~/Library-
+git pull
+```
+
+### 4. Подготовить локальную модель
 
 ```bash
 mkdir -p ~/models
 ```
 
-Place a compatible Qwen2.5-Coder GGUF file there. For 8 GB RAM start with a 1.5B or 3B Q4 model. For 12–16 GB RAM test 7B Q4.
+Положите совместимую Qwen2.5-Coder GGUF-модель в `~/models/`.
 
-Edit `config.py` if your model filename differs.
+Для телефона с 8 ГБ RAM начинайте с:
 
-## 3. Select the game project
+```text
+Qwen2.5-Coder-1.5B-Instruct Q4_K_M
+```
 
-The default is:
+или:
+
+```text
+Qwen2.5-Coder-3B-Instruct Q4_K_M
+```
+
+Для 12–16 ГБ RAM можно тестировать 7B Q4.
+
+Проверьте файл:
+
+```bash
+ls -lh ~/models/*.gguf
+```
+
+По умолчанию система ожидает:
+
+```text
+~/models/qwen2.5-coder-3b-instruct-q4_k_m.gguf
+```
+
+Если имя другое, измените `MODEL_PATH` в `agent_system/config.py`.
+
+### 5. Указать игру
+
+По умолчанию:
 
 ```text
 ~/Game
 ```
 
-Edit `PROJECT_DIR` in `config.py` to point to the existing game repository. The agent writes only inside that directory.
+В `agent_system/config.py` можно указать другой абсолютный путь в `PROJECT_DIR`.
 
-## 4. Start an agent task
+### 6. Проверить модель до запуска агентов
+
+```bash
+cd ~/Library-/agent_system
+python -c "from llm import ask; print(ask('Ответь одним словом: готов'))"
+```
+
+Если эта команда возвращает ответ Qwen, локальный inference работает.
+
+### 7. Запустить агента
 
 ```bash
 cd ~/Library-/agent_system
 python run_agent.py "Добавь экран меню с кнопками Start, Settings и Exit"
 ```
 
-The runner performs:
+Цикл:
 
 ```text
-Planner → Coder → make test → Fixer → make test
+Planner → Coder → Test → Fixer → Test
 ```
 
-It stops after `MAX_FIX_ATTEMPTS` failed repair cycles.
+## Что система может менять
 
-## 5. Safety model
+Агент работает только внутри `PROJECT_DIR`.
 
-The current implementation deliberately does **not** give the model unrestricted shell access. Only exact commands listed in `config.py` can be executed by the testing tool.
+Он не получает произвольный shell-доступ. Команды тестирования должны присутствовать в allow-list в `config.py`.
 
-The model's file edits are constrained to `PROJECT_DIR`; absolute paths and `..` traversal are rejected.
-
-Command output is appended to:
+Командный журнал:
 
 ```text
 <PROJECT_DIR>/.agent_commands.log
 ```
 
-## 6. Existing repository files
+## Защита существующих файлов
 
-`README.md` and `SETUP_TERMUX.md` are existing project files and are intentionally left unchanged. This directory is additive.
+Система не должна удалять существующие исходники игры. Не используйте `rm`, `git clean` или другие команды удаления через агентный контур.
 
-## 7. Limitations
+Текущая версия перед применением ответа модели проверяет путь, но полное содержимое изменяемого файла может быть заменено. Перед реальной разработкой рекомендуется добавить резервные копии/патч-режим и проверку diff.
 
-This first version does not include automatic git commits, network access, package installation by the model, or arbitrary shell commands. Those should remain explicit human-controlled operations until the agent is tested on the actual phone and game project.
+## Ограничения
+
+- API-ключ не нужен.
+- Интернет нужен только для первоначальной установки Termux-пакетов, получения репозитория и загрузки модели.
+- После установки inference выполняется локально через `llama-cli`.
+- Автоматические `git commit`, `git push`, установка Python-пакетов моделью и произвольные shell-команды намеренно не включены.
