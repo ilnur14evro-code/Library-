@@ -2,9 +2,9 @@
 
 Локальная система Qwen 2.5-Coder агентов для Android + Termux.
 
-## Полная установка
+## Полная установка: один основной сценарий
 
-Откройте Termux и выполняйте команды по порядку.
+После установки актуального Termux выполните **только эти команды по порядку**:
 
 ### 1. Обновить Termux
 
@@ -20,15 +20,10 @@ termux-change-repo
 pkg update -y
 ```
 
-### 2. Установить базовые пакеты
+### 2. Скачать Library-
 
 ```bash
-pkg install -y git curl python clang cmake make
-```
-
-### 3. Скачать репозиторий
-
-```bash
+pkg install -y git
 cd ~
 git clone https://github.com/ilnur14evro-code/Library-.git
 cd ~/Library-
@@ -43,48 +38,67 @@ cd ~/Library-
 git pull --ff-only
 ```
 
-### 4. Установить локальный llama.cpp
-
-Сначала автоматический установщик:
+### 3. Запустить автоматическую установку
 
 ```bash
 bash ./install_termux.sh
 ```
 
-Он проверяет готовый `llama-cpp` и, если `llama-cli` отсутствует, собирает `llama.cpp` прямо в Termux.
-
-Проверка:
-
-```bash
-llama-cli --version
-```
-
-### 5. Подготовить Qwen2.5-Coder
-
-```bash
-mkdir -p ~/models
-ls -lh ~/models/*.gguf
-```
-
-Поместите локальную Qwen2.5-Coder GGUF-модель в `~/models/`.
-
-Для первого запуска обычно разумно начать с 1.5B или 3B Q4. Если модели нужно другое имя, измените `MODEL_PATH` в:
+Установщик автоматически:
 
 ```text
-~/Library-/agent_system/config.py
+установит git/python/clang/cmake/make/curl
+        ↓
+проверит llama-cli
+        ↓
+установит llama-cpp или соберёт llama.cpp
+        ↓
+создаст ~/models
+        ↓
+скачает Qwen2.5-Coder-3B-Instruct Q4_K_M
+        ↓
+настроит MODEL_PATH
+        ↓
+проверит Qwen
+        ↓
+проверит Python-агентов
 ```
 
-### 6. Проверить Qwen до запуска агентов
+Q4_K_M-файл 3B занимает около 2.1 GB. citeturn156303search0
+
+### Важно: не вводите название модели как команду
+
+Неправильно:
+
+```bash
+Qwen2.5-Coder-3B-Instruct Q4_K_M
+```
+
+Это **название модели**, а не команда Termux. Установщик сам скачивает файл:
+
+```text
+~/models/qwen2.5-coder-3b-instruct-q4_k_m.gguf
+```
+
+### 4. Проверить модель
+
+```bash
+ls -lh ~/models/qwen2.5-coder-3b-instruct-q4_k_m.gguf
+```
+
+Затем:
 
 ```bash
 llama-cli \
   -m ~/models/qwen2.5-coder-3b-instruct-q4_k_m.gguf \
-  -c 4096 \
-  -n 64 \
+  -c 2048 \
+  -n 32 \
   -p "Ответь одним словом: готов"
 ```
 
-### 7. Подготовить игру
+Локальный запуск GGUF через `llama-cli` поддерживается документацией модели. citeturn156303search0
+
+### 5. Подготовить игру
 
 По умолчанию агент использует:
 
@@ -92,22 +106,26 @@ llama-cli \
 ~/Game
 ```
 
-Проверьте:
+Проверить:
 
 ```bash
 ls -la ~/Game
 ```
 
-При необходимости измените `PROJECT_DIR` в `agent_system/config.py`.
+Если игра находится в другом месте, измените `PROJECT_DIR` в:
 
-### 8. Проверить Python-часть
+```text
+~/Library-/agent_system/config.py
+```
+
+### 6. Проверить Python-часть
 
 ```bash
 cd ~/Library-/agent_system
 python -m py_compile config.py llm.py tools.py agents.py run_agent.py
 ```
 
-### 9. Запустить агента
+### 7. Запустить агента
 
 ```bash
 cd ~/Library-/agent_system
@@ -122,7 +140,7 @@ Planner → Coder → Test → Fixer → Test
 
 ## Без API
 
-После загрузки модели и зависимостей inference выполняется локально:
+После загрузки модели inference выполняется локально:
 
 ```text
 Termux → Python → llama-cli → Qwen GGUF → файлы игры
@@ -134,14 +152,29 @@ API-ключ не нужен.
 
 Агент не получает произвольный shell-доступ. Команды тестов ограничены `ALLOWED_COMMANDS` в `agent_system/config.py`.
 
-Файловые изменения ограничены `PROJECT_DIR`. Существующие файлы репозитория не удаляются установщиком.
+Файловые изменения ограничены `PROJECT_DIR`.
 
-## Если установка не проходит
+Установщик не выполняет `rm`, `git clean` или другие операции удаления файлов `Library-`.
 
-Подробная пошаговая диагностика находится в:
+## Повторная установка
+
+Если установка была прервана:
+
+```bash
+cd ~/Library-
+bash ./install_termux.sh
+```
+
+Скачанный файл модели повторно не загружается. Прерванную загрузку установщик может продолжить.
+
+**Не удаляйте `~/Library-` для повторной установки.**
+
+## Подробная инструкция и диагностика
+
+Смотрите:
 
 ```text
 SETUP_TERMUX.md
 ```
 
-Не удаляйте `~/Library-` для повторной установки. Сначала исправьте ошибку и повторите нужный шаг.
+Там разобраны ошибки `command not found`, `model not found`, проблемы `pkg`, сборка `llama.cpp`, память Android и проверка агентной системы.
