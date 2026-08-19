@@ -22,10 +22,13 @@ pkg upgrade -y
 say "Установка базовых зависимостей"
 pkg install -y git python clang cmake make curl
 
-say "Получение Library-"
+say "Проверка Library-"
 if [ -d "$REPO_DIR/.git" ]; then
-    git -C "$REPO_DIR" pull --ff-only
+    git -C "$REPO_DIR" pull --ff-only || fail "Не удалось обновить Library-. Сначала проверьте git -C '$REPO_DIR' status."
 else
+    if [ -e "$REPO_DIR" ]; then
+        fail "$REPO_DIR уже существует, но это не Git-репозиторий. Не удаляйте его автоматически. Проверьте содержимое вручную."
+    fi
     git clone "$REPO_URL" "$REPO_DIR"
 fi
 
@@ -33,8 +36,8 @@ say "Проверка llama-cli"
 if command -v llama-cli >/dev/null 2>&1; then
     echo "llama-cli уже установлен: $(command -v llama-cli)"
 else
-    if pkg search llama-cpp 2>/dev/null | grep -Eiq '(^|[[:space:]])llama-cpp([[:space:]]|$)'; then
-        say "Установка готового пакета llama-cpp"
+    say "Попытка установки пакета llama-cpp"
+    if pkg search llama-cpp >/dev/null 2>&1; then
         pkg install -y llama-cpp || true
     fi
 fi
@@ -43,6 +46,8 @@ if ! command -v llama-cli >/dev/null 2>&1; then
     say "Сборка llama.cpp внутри Termux"
     if [ -d "$LLAMA_SRC/.git" ]; then
         git -C "$LLAMA_SRC" pull --ff-only
+    elif [ -e "$LLAMA_SRC" ]; then
+        fail "$LLAMA_SRC уже существует, но это не Git-репозиторий. Удалять его автоматически нельзя."
     else
         git clone --depth=1 https://github.com/ggml-org/llama.cpp.git "$LLAMA_SRC"
     fi
@@ -64,12 +69,12 @@ fi
 say "Подготовка каталога модели"
 mkdir -p "$MODEL_DIR"
 
-if [ -f "$MODEL_PATH" ]; then
+if [ -s "$MODEL_PATH" ]; then
     echo "Модель уже загружена: $MODEL_PATH"
 else
     say "Загрузка Qwen2.5-Coder-3B-Instruct Q4_K_M (~2.1 GB)"
     echo "Не вводите имя модели как команду. Установщик сам скачивает файл."
-    echo "Можно прервать загрузку и повторно запустить этот скрипт: curl продолжит загрузку."
+    echo "Если загрузка прервётся, повторно запустите этот скрипт."
     curl -L --fail --retry 3 --retry-delay 3 --continue-at - \
         -o "$MODEL_PATH" \
         "$MODEL_URL"
@@ -96,16 +101,16 @@ PY
 say "Проверка llama.cpp и Qwen"
 python --version
 llama-cli --version
-llama-cli \
+if ! llama-cli \
     -m "$MODEL_PATH" \
     -c 2048 \
     -n 32 \
     -p "Ответь одним словом: готов" \
-    >/tmp/qwen_test.out
+    >/tmp/qwen_test.out 2>/tmp/qwen_test.err; then
+    cat /tmp/qwen_test.err >&2
+    fail "Qwen не запустился. Самая частая причина на телефоне — недостаток RAM или неподходящий GGUF."
+fi
 cat /tmp/qwen_test.out
-
-GAME_DIR="${HOME}/Game"
-mkdir -p "$GAME_DIR"
 
 say "Проверка Python-файлов агентов"
 cd "$REPO_DIR/agent_system"
@@ -125,9 +130,9 @@ llama-cli:
   $(command -v llama-cli)
 
 Игровой проект по умолчанию:
-  $GAME_DIR
+  ${HOME}/Game
 
-Проверка агента:
+Запуск агента:
   cd "$REPO_DIR/agent_system"
   python run_agent.py "Добавь небольшое изменение в игру и запусти тесты"
 
