@@ -16,7 +16,7 @@ say "Обновление Termux"
 pkg update -y
 pkg upgrade -y
 
-say "Установка зависимостей"
+say "Установка базовых зависимостей"
 pkg install -y git python clang cmake make curl
 
 say "Получение Library-"
@@ -30,6 +30,13 @@ say "Проверка llama-cli"
 if command -v llama-cli >/dev/null 2>&1; then
     echo "llama-cli уже установлен: $(command -v llama-cli)"
 else
+    say "Проверка пакета llama-cpp"
+    if pkg search llama-cpp 2>/dev/null | grep -q '^llama-cpp'; then
+        pkg install -y llama-cpp || true
+    fi
+fi
+
+if ! command -v llama-cli >/dev/null 2>&1; then
     say "Сборка llama.cpp внутри Termux"
     if [ -d "$LLAMA_SRC/.git" ]; then
         git -C "$LLAMA_SRC" pull --ff-only
@@ -55,13 +62,13 @@ fi
 say "Подготовка каталогов"
 mkdir -p "$MODEL_DIR"
 
-say "Проверка Python"
+say "Проверка установки"
 python --version
 llama-cli --version
 
 cat <<EOF
 
-Установка завершена.
+Установка базовой среды завершена.
 
 Репозиторий:
   $REPO_DIR
@@ -69,18 +76,15 @@ cat <<EOF
 Папка моделей:
   $MODEL_DIR
 
-Установленный llama-cli:
+llama-cli:
   $(command -v llama-cli)
 
-Следующий шаг:
-  cd "$REPO_DIR/agent_system"
-  sed -n '1,220p' README.md
-
-Поместите локальный GGUF Qwen2.5-Coder в:
-  $MODEL_DIR
-
-После этого проверьте путь модели в:
-  $REPO_DIR/agent_system/config.py
+Следующие шаги:
+  1. Поместите Qwen2.5-Coder GGUF в $MODEL_DIR
+  2. Проверьте MODEL_PATH в $REPO_DIR/agent_system/config.py
+  3. Проверьте модель через llama-cli
+  4. Проверьте существующий проект игры в ~/Game
+  5. Запустите: cd $REPO_DIR/agent_system && python run_agent.py "Задача"
 
 Важно: существующие файлы репозитория не удаляются этим установщиком.
 EOF
