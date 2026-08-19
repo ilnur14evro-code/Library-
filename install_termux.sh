@@ -7,8 +7,13 @@ LLAMA_SRC="${HOME}/llama.cpp"
 MODEL_DIR="${HOME}/models"
 MODEL_FILE="qwen2.5-coder-3b-instruct-q4_k_m.gguf"
 MODEL_PATH="${MODEL_DIR}/${MODEL_FILE}"
+PART_PATH="${MODEL_PATH}.part"
 MODEL_URL="https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF/resolve/main/${MODEL_FILE}?download=true"
+EXPECTED_SHA256="724fb256bec1ff062b2f65e4569e871ad2e95ab2a3989723d1769c54294730b7"
 BIN_DIR="${PREFIX}/bin"
+CACHE_DIR="${HOME}/.cache/library-qwen"
+TEST_OUT="${CACHE_DIR}/qwen_test.out"
+TEST_ERR="${CACHE_DIR}/qwen_test.err"
 
 say() { printf '\n==> %s\n' "$*"; }
 fail() { printf '\nERROR: %s\n' "$*" >&2; exit 1; }
@@ -67,35 +72,51 @@ if ! command -v llama-cli >/dev/null 2>&1; then
 fi
 
 say "Подготовка каталога модели"
-mkdir -p "$MODEL_DIR"
+mkdir -p "$MODEL_DIR" "$CACHE_DIR"
 
-# Проверяем не только наличие файла, но и GGUF header. Это защищает от
-# обрезанной/повреждённой загрузки, которую llama.cpp иначе обнаружит слишком поздно.
-valid_gguf() {
-    [ -s "$MODEL_PATH" ] || return 1
-    [ "$(wc -c < "$MODEL_PATH")" -gt 100000000 ] || return 1
-    [ "$(dd if="$MODEL_PATH" bs=1 count=4 2>/dev/null)" = "GGUF" ] || return 1
+verify_model() {
+    [ -s "$1" ] || return 1
+    local actual
+    actual="$(sha256sum "$1" | awk '{print $1}')"
+    [ "$actual" = "$EXPECTED_SHA256" ]
 }
 
-if valid_gguf; then
-    echo "Модель найдена и похожа на корректный GGUF: $MODEL_PATH"
-else
-    if [ -e "$MODEL_PATH" ]; then
-        say "Обнаружена неполная или повреждённая модель — начинаем загрузку заново"
-        # Сохраняем старый файл, чтобы его можно было удалить вручную при необходимости,
-        # но не продолжаем curl поверх заведомо повреждённого файла.
-        mv "$MODEL_PATH" "${MODEL_PATH}.broken.$(date +%Y%m%d-%H%M%S)"
+if [ -s "$MODEL_PATH" ]; then
+    say "Проверка существующей модели"
+    if verify_model "$MODEL_PATH"; then
+        echo "Модель корректна: $MODEL_PATH"
+    else
+        BROKEN_PATH="${MODEL_PATH}.broken.$(date +%Y%m%d-%H%M%S)"
+        echo "Существующий GGUF не совпадает с контрольной суммой. Сохраняю его как: $BROKEN_PATH"
+        mv "$MODEL_PATH" "$BROKEN_PATH"
     fi
-
-    say "Загрузка Qwen2.5-Coder-3B-Instruct Q4_K_M (~2.1 GB)"
-    echo "Не вводите имя модели как команду. Установщик сам скачивает файл."
-    echo "При обрыве связи можно повторно запустить этот скрипт."
-    curl -L --fail --retry 5 --retry-delay 3 --continue-at - \
-        -o "$MODEL_PATH" \
-        "$MODEL_URL"
 fi
 
-valid_gguf || fail "Скачанный файл не похож на полный GGUF. Проверьте интернет и повторите установку."
+if [ ! -s "$MODEL_PATH" ]; then
+    say "Загрузка Qwen2.5-Coder-3B-Instruct Q4_K_M"
+    echo "Целевой файл: $MODEL_PATH"
+    echo "SHA256 оригинального файла Qwen: $EXPECTED_SHA256"
+    echo "Не вводите имя модели как команду. Установщик скачивает .gguf сам."
+
+    if [ -s "$PART_PATH" ]; then
+        echo "Продолжаем незавершённую загрузку: $PART_PATH"
+    fi
+
+    curl -L --fail --retry 5 --retry-delay 3 --continue-at - \
+        -o "$PART_PATH" \
+        "$MODEL_URL"
+
+    if ! verify_model "$PART_PATH"; then
+        echo "SHA256 загруженного файла не совпадает. Начинаю чистую загрузку."
+        rm -f "$PART_PATH"
+        curl -L --fail --retry 5 --retry-delay 3 \
+            -o "$PART_PATH" \
+            "$MODEL_URL"
+    fi
+
+    verify_model "$PART_PATH" || fail "Файл модели скачан, но SHA256 не совпадает. Это нерабочая/неполная загрузка. Повторите установку; Library- удалять не нужно."
+    mv "$PART_PATH" "$MODEL_PATH"
+fi
 
 say "Настройка пути модели"
 python - "$REPO_DIR/agent_system/config.py" "$MODEL_FILE" <<'PY'
@@ -121,11 +142,11 @@ if ! llama-cli \
     -c 2048 \
     -n 32 \
     -p "Ответь одним словом: готов" \
-    >/tmp/qwen_test.out 2>/tmp/qwen_test.err; then
-    cat /tmp/qwen_test.err >&2
-    fail "Qwen не запустился. Если ошибка содержит 'data is not within the file bounds', GGUF повреждён или неполон. Установщик теперь проверяет header и повторяет загрузку."
+    >"$TEST_OUT" 2>"$TEST_ERR"; then
+    cat "$TEST_ERR" >&2 || true
+    fail "Qwen не запустился. Если SHA256 совпадает, смотрите ошибку выше: это уже проблема запуска или памяти, а не повреждённого файла."
 fi
-cat /tmp/qwen_test.out
+cat "$TEST_OUT"
 
 say "Проверка Python-файлов агентов"
 cd "$REPO_DIR/agent_system"
@@ -141,6 +162,9 @@ Library-:
 Модель:
   $MODEL_PATH
 
+SHA256:
+  $EXPECTED_SHA256
+
 llama-cli:
   $(command -v llama-cli)
 
@@ -155,5 +179,6 @@ llama-cli:
   - API-ключ не используется.
   - После загрузки модели inference выполняется локально.
   - Существующие файлы Library- этим скриптом не удаляются.
+  - Повреждённая модель сохраняется с суффиксом .broken.<дата>, а не удаляется.
   - Не вводите "Qwen2.5-Coder-3B-Instruct Q4_K_M" как команду: это название модели, а не команда Termux.
 EOF
