@@ -21,41 +21,22 @@ termux-change-repo
 
 Выберите основной репозиторий Termux и повторите `pkg update -y`.
 
-### 2. Установить зависимости
+### 2. Рекомендуемый способ: автоматический установщик из Library-
+
+Сначала скачайте только установщик:
 
 ```bash
-pkg install -y git python clang cmake make
+curl -fsSL https://raw.githubusercontent.com/ilnur14evro-code/Library-/main/install_termux.sh -o "$PREFIX/tmp/install_library.sh"
+bash "$PREFIX/tmp/install_library.sh"
 ```
 
-`llama-cpp` является пакетом Termux. Сначала установите его напрямую:
+Он устанавливает зависимости, получает `Library-`, проверяет `llama-cli` и при отсутствии `llama-cli` собирает `llama.cpp` из исходников внутри Termux.
 
-```bash
-pkg install -y llama-cpp
-```
+Существующие файлы `~/Library-` не удаляются.
 
-Проверка:
+### 3. Ручной способ получить репозиторий
 
-```bash
-command -v llama-cli
-llama-cli --version
-```
-
-Если `pkg install llama-cpp` сообщает, что пакет не найден, не переходите сразу к ручной сборке: сначала выполните `termux-change-repo`, затем:
-
-```bash
-pkg update -y
-pkg install -y llama-cpp
-```
-
-Если пакет установлен, но `llama-cli` не запускается, проверьте доступные backend-пакеты:
-
-```bash
-pkg search llama-cpp
-```
-
-Для первого запуска используйте CPU backend. Дополнительные GPU/OpenCL/Vulkan backend-пакеты не обязательны.
-
-### 3. Получить репозиторий
+Правильно:
 
 ```bash
 cd ~
@@ -63,14 +44,27 @@ git clone https://github.com/ilnur14evro-code/Library-.git
 cd ~/Library-
 ```
 
+Не добавляйте `<` и `>` вокруг URL.
+
 Если репозиторий уже скачан:
 
 ```bash
 cd ~/Library-
-git pull
+git pull --ff-only
 ```
 
-### 4. Подготовить локальную модель
+### 4. Проверить llama.cpp
+
+Если `llama-cli` уже есть в Termux:
+
+```bash
+command -v llama-cli
+llama-cli --version
+```
+
+Если его нет, автоматический установщик соберёт его сам. Для Android/Termux сборка выполняется с консервативными параметрами и только для `llama-cli`.
+
+### 5. Подготовить локальную модель
 
 ```bash
 mkdir -p ~/models
@@ -106,16 +100,6 @@ ls -lh ~/models/*.gguf
 
 Если имя другое, измените `MODEL_PATH` в `agent_system/config.py`.
 
-### 5. Указать игру
-
-По умолчанию:
-
-```text
-~/Game
-```
-
-В `agent_system/config.py` можно указать другой абсолютный путь в `PROJECT_DIR`.
-
 ### 6. Проверить модель до запуска агентов
 
 ```bash
@@ -125,7 +109,17 @@ python -c "from llm import ask; print(ask('Ответь одним словом:
 
 Если эта команда возвращает ответ Qwen, локальный inference работает.
 
-### 7. Запустить агента
+### 7. Указать игру
+
+По умолчанию:
+
+```text
+~/Game
+```
+
+В `agent_system/config.py` можно указать другой абсолютный путь в `PROJECT_DIR`.
+
+### 8. Запустить агента
 
 ```bash
 cd ~/Library-/agent_system
@@ -152,7 +146,7 @@ Planner → Coder → Test → Fixer → Test
 
 ## Защита существующих файлов
 
-Система не должна удалять существующие исходники игры. Не используйте `rm`, `git clean` или другие команды удаления через агентный контур.
+Система не содержит команд удаления файлов. Не используйте `rm`, `git clean` или другие команды удаления через агентный контур.
 
 Текущая версия перед применением ответа модели проверяет путь, но полное содержимое изменяемого файла может быть заменено. Перед реальной разработкой рекомендуется добавить резервные копии/патч-режим и проверку diff.
 
