@@ -2,102 +2,146 @@
 
 Локальная система Qwen 2.5-Coder агентов для Android + Termux.
 
-## Установка с нуля — один сценарий
+## Установка с нуля — строгая последовательность
 
-Выполняйте команды **по порядку**. Название модели не является командой Termux.
+**Не пропускайте шаги и не вводите название модели как команду.**
 
-### 1. Установить Termux
+### Шаг 1. Установить Termux
 
 Используйте актуальный Termux из F-Droid или официального GitHub-репозитория Termux.
 
-После запуска:
+Откройте Termux и выполните:
 
 ```bash
 pkg update -y
 pkg upgrade -y
 ```
 
-Если `pkg update` сообщает об ошибке зеркала:
+Если появляется ошибка зеркала:
 
 ```bash
 termux-change-repo
 pkg update -y
 ```
 
-### 2. Скачать репозиторий
+### Шаг 2. Установить Git
 
 ```bash
 pkg install -y git
+```
+
+Проверка:
+
+```bash
+git --version
+```
+
+### Шаг 3. Скачать Library-
+
+```bash
 cd ~
 git clone https://github.com/ilnur14evro-code/Library-.git
 cd ~/Library-
 ```
 
-URL вводится **без** `<` и `>`.
+Важно: URL должен быть **без** `<` и `>`.
 
-Если `~/Library-` уже существует:
+Если `~/Library-` уже существует, не удаляйте его:
 
 ```bash
 cd ~/Library-
 git pull --ff-only
 ```
 
-### 3. Запустить установщик
+### Шаг 4. Установить базовые зависимости
 
 ```bash
-bash ./install_termux.sh
-```
-
-Установщик сам:
-
-```text
-установит зависимости
-        ↓
-проверит / установит llama-cli
-        ↓
-при необходимости соберёт llama.cpp
-        ↓
-создаст ~/models
-        ↓
-скачает Qwen2.5-Coder-3B-Instruct Q4_K_M
-        ↓
-настроит MODEL_PATH
-        ↓
-запустит тест Qwen
-        ↓
-проверит Python-агентов
-```
-
-### 4. Не вводите название модели вручную
-
-Неправильно:
-
-```bash
-Qwen2.5-Coder-3B-Instruct Q4_K_M
-```
-
-Это **название модели**, а не команда.
-
-После работы установщика должен существовать файл:
-
-```text
-/data/data/com.termux/files/home/models/qwen2.5-coder-3b-instruct-q4_k_m.gguf
+pkg install -y python clang cmake make curl
 ```
 
 Проверка:
 
 ```bash
-ls -lh ~/models/qwen2.5-coder-3b-instruct-q4_k_m.gguf
+python --version
+clang --version
+cmake --version
+curl --version
 ```
 
-### 5. Проверить llama.cpp и Qwen
+### Шаг 5. Установить llama.cpp
+
+Из каталога `~/Library-` запускайте:
+
+```bash
+bash ./install_termux.sh
+```
+
+Установщик автоматически:
+
+```text
+1. проверяет llama-cli
+2. при необходимости устанавливает llama-cpp
+3. если llama-cli всё ещё нет — собирает llama.cpp
+4. создаёт каталог ~/models
+5. скачивает Qwen2.5-Coder-3B-Instruct Q4_K_M
+6. сохраняет модель в ~/models
+7. прописывает MODEL_PATH
+8. проверяет запуск модели
+9. проверяет Python-код агентов
+```
+
+### Шаг 6. Где именно будет модель
+
+После установки модель должна находиться **именно здесь**:
+
+```text
+/data/data/com.termux/files/home/models/qwen2.5-coder-3b-instruct-q4_k_m.gguf
+```
+
+То же самое через `~`:
+
+```text
+~/models/qwen2.5-coder-3b-instruct-q4_k_m.gguf
+```
+
+Проверка:
+
+```bash
+mkdir -p ~/models
+ls -lh ~/models/
+```
+
+Ожидаемый файл:
+
+```text
+qwen2.5-coder-3b-instruct-q4_k_m.gguf
+```
+
+**После создания `~/models` не нужно писать туда `Qwen2.5-Coder-3B-Instruct Q4_K_M`.** Это название модели, не команда.
+
+### Шаг 7. Если автоматическая загрузка модели не запускалась
+
+Не удаляйте репозиторий. Выполните:
+
+```bash
+cd ~/Library-
+bash ./install_termux.sh
+```
+
+Установщик сам создаст `~/models` и скачает `.gguf`.
+
+Если загрузка была прервана, снова выполните ту же команду. Загрузка продолжается.
+
+### Шаг 8. Проверить llama-cli
 
 ```bash
 command -v llama-cli
 llama-cli --version
 ```
 
-Затем:
+### Шаг 9. Проверить модель
+
+После того как файл существует:
 
 ```bash
 llama-cli \
@@ -107,9 +151,32 @@ llama-cli \
   -p "Ответь одним словом: готов"
 ```
 
-Ожидаемый результат — ответ модели, например `готов`.
+Нормальный результат — ответ Qwen.
 
-### 6. Подготовить игру
+### Шаг 10. Проверить путь, который использует агент
+
+```bash
+cd ~/Library-/agent_system
+python -c 'from config import MODEL_PATH; print(MODEL_PATH); print(MODEL_PATH.exists())'
+```
+
+Ожидается:
+
+```text
+/data/data/com.termux/files/home/models/qwen2.5-coder-3b-instruct-q4_k_m.gguf
+True
+```
+
+### Шаг 11. Проверить Python-агентов
+
+```bash
+cd ~/Library-/agent_system
+python -m py_compile config.py llm.py tools.py agents.py run_agent.py
+```
+
+Если команда ничего не выводит — проверка пройдена.
+
+### Шаг 12. Подготовить игру
 
 По умолчанию агент работает в:
 
@@ -123,28 +190,27 @@ llama-cli \
 ls -la ~/Game
 ```
 
-Если игра находится в другом каталоге, измените `PROJECT_DIR` в:
+Если игра находится в другом месте, измените `PROJECT_DIR` в:
 
 ```text
 ~/Library-/agent_system/config.py
 ```
 
-Используйте абсолютный путь.
+### Шаг 13. Проверить игру без AI
 
-### 7. Проверить Python-агентов
+До запуска агента желательно проверить сам проект:
 
 ```bash
-cd ~/Library-/agent_system
-python -m py_compile config.py llm.py tools.py agents.py run_agent.py
+cd ~/Game
+make
+make test
 ```
 
-Если команда завершилась без вывода — синтаксис корректен.
-
-### 8. Запустить агента
+### Шаг 14. Запустить систему агентов
 
 ```bash
 cd ~/Library-/agent_system
-python run_agent.py "Добавь главное меню в игру"
+python run_agent.py "Проверь проект игры и сделай небольшое изменение"
 ```
 
 Цикл:
@@ -153,87 +219,103 @@ python run_agent.py "Добавь главное меню в игру"
 Planner → Coder → Test → Fixer → Test
 ```
 
-## Повторная установка
+## Полный сценарий с нуля одной последовательностью
 
-Если установка прервалась:
+Ниже — команды **в точном порядке** для чистого Termux:
+
+```bash
+pkg update -y
+pkg upgrade -y
+pkg install -y git
+cd ~
+git clone https://github.com/ilnur14evro-code/Library-.git
+cd ~/Library-
+pkg install -y python clang cmake make curl
+bash ./install_termux.sh
+ls -lh ~/models/
+llama-cli --version
+llama-cli -m ~/models/qwen2.5-coder-3b-instruct-q4_k_m.gguf -c 2048 -n 32 -p "Ответь: готов"
+cd ~/Library-/agent_system
+python -m py_compile config.py llm.py tools.py agents.py run_agent.py
+python run_agent.py "Проверь проект игры"
+```
+
+## Если видите `Qwen2.5-Coder-3B-Instruct: command not found`
+
+Вы ввели **название модели вместо команды**.
+
+Ничего удалять не нужно. Выполните:
 
 ```bash
 cd ~/Library-
 bash ./install_termux.sh
 ```
 
-Не удаляйте `~/Library-`.
-
-Установщик не выполняет `rm`, `git clean` или автоматическое удаление существующих файлов.
-
-## Если появляется `Local model not found`
-
-Проверьте:
+Затем:
 
 ```bash
 ls -lh ~/models/
 ```
 
-Если `.gguf` нет:
+## Если видите `Local model not found`
+
+Проверьте:
+
+```bash
+ls -lh ~/models/qwen2.5-coder-3b-instruct-q4_k_m.gguf
+```
+
+Если файла нет:
 
 ```bash
 cd ~/Library-
 bash ./install_termux.sh
 ```
 
-Если файл есть, но ошибка сохраняется:
+Если файл есть:
 
 ```bash
 cd ~/Library-/agent_system
 python -c 'from config import MODEL_PATH; print(MODEL_PATH); print(MODEL_PATH.exists())'
 ```
 
-Вторая строка должна быть:
-
-```text
-True
-```
-
-## Если появляется `Qwen2.5-Coder-3B-Instruct: command not found`
-
-Вы ввели название модели как команду. Ничего удалять не нужно. Запустите установщик:
+## Если видите `llama-cli: command not found`
 
 ```bash
 cd ~/Library-
 bash ./install_termux.sh
 ```
 
-## Если появляется `llama-cli: command not found`
+## Повторная установка
+
+Для повторного запуска используйте только:
 
 ```bash
 cd ~/Library-
 bash ./install_termux.sh
 ```
 
-## Если не хватает RAM
+**Не выполняйте:**
 
-Начните с меньшей GGUF-квантизации/модели и уменьшите `CONTEXT_SIZE` в `agent_system/config.py`, например до `2048`.
-
-## Архитектура
-
-```text
-Android
-  ↓
-Termux
-  ↓
-Python agent_system
-  ↓
-llama-cli
-  ↓
-Qwen2.5-Coder GGUF
-  ↓
-локальные файлы игры
+```bash
+rm -rf ~/Library-
+git clean -fd
 ```
 
-API-ключ для inference не используется.
+Установщик не удаляет существующие файлы `Library-`.
 
-### Безопасность
+## Без API
 
-Агент не получает произвольный shell-доступ. Команды сборки/тестов ограничены `ALLOWED_COMMANDS` в `agent_system/config.py`. Пути ограничены `PROJECT_DIR`. Установщик не удаляет существующие файлы репозитория.
+После загрузки модели inference выполняется локально:
+
+```text
+Android → Termux → llama-cli → Qwen2.5-Coder GGUF → локальный проект игры
+```
+
+API-ключ не используется.
+
+## Безопасность
+
+Агент не получает произвольный shell-доступ. Команды сборки/тестов ограничены `ALLOWED_COMMANDS` в `agent_system/config.py`, а файловые изменения ограничены `PROJECT_DIR`.
 
 Подробная диагностика: `SETUP_TERMUX.md`.
