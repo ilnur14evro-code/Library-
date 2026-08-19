@@ -101,15 +101,13 @@ pkg install -y git python clang cmake make curl
 ~/models/qwen2.5-coder-3b-instruct-q4_k_m.gguf
 ```
 
-Размер этой Q4_K_M-модели в репозитории GGUF составляет около **2.1 GB**. citeturn156303search0
+Размер этой Q4_K_M-модели в репозитории GGUF составляет около **2.1 GB**.
 
 Источник модели:
 
 ```text
 Qwen/Qwen2.5-Coder-3B-Instruct-GGUF
 ```
-
-На странице модели прямо указан вариант `Q4_K_M` для llama.cpp. citeturn156303search0
 
 Установщик использует загрузку с продолжением:
 
@@ -150,8 +148,6 @@ llama-cli \
   -n 32 \
   -p "Ответь одним словом: готов"
 ```
-
-Страница GGUF также показывает запуск Qwen через `llama-cli` и локальный `.gguf`-файл. citeturn156303search0
 
 ## 6. Где находится модель после установки
 
