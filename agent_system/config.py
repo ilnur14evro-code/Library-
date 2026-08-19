@@ -1,12 +1,12 @@
 from pathlib import Path
 
-# Change this path after downloading your local GGUF model.
+# Local GGUF Qwen2.5-Coder model.
 MODEL_PATH = Path.home() / "models" / "qwen2.5-coder-3b-instruct-q4_k_m.gguf"
 
-# Existing game/project directory. Override with an absolute path if needed.
+# Existing game/project directory. Change to an absolute path if needed.
 PROJECT_DIR = Path.home() / "Game"
 
-# llama.cpp executable. Termux package or local build may expose llama-cli here.
+# Installed by: pkg install llama-cpp
 LLAMA_CLI = "llama-cli"
 
 CONTEXT_SIZE = 4096
@@ -14,7 +14,8 @@ MAX_TOKENS = 1024
 TEMPERATURE = 0.2
 MAX_FIX_ATTEMPTS = 3
 
-# Commands explicitly allowed to the test/build tool.
+# Exact commands allowed to the build/test tool.
+# No delete command is included.
 ALLOWED_COMMANDS = {
     "make",
     "make test",
