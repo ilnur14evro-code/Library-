@@ -28,7 +28,7 @@ make --version
 ## 3. Скачать проект
 
 ```bash
-git clone <URL_РЕПОЗИТОРИЯ>
+git clone <https://github.com/ilnur14evro-code/Game>
 ```
 
 Перейти в каталог проекта:
