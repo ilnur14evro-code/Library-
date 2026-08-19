@@ -163,8 +163,6 @@ cmake --build build --config Release --target llama-cli -j 2
 install -m 755 build/bin/llama-cli "$PREFIX/bin/llama-cli"
 ```
 
-Отключение native-оптимизаций и сборка только `llama-cli` используются как более консервативный вариант для Android/Termux. В сообществе llama.cpp также описаны случаи проблем Android-сборки и рабочие варианты с отключением `GGML_NATIVE`/лишних targets. citeturn798422search0turn798422search8
-
 ## 11. Запуск существующей игры
 
 Эта часть проекта не изменяет игровой репозиторий автоматически.
