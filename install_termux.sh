@@ -20,39 +20,38 @@ fail() { printf '\nERROR: %s\n' "$*" >&2; exit 1; }
 
 command -v pkg >/dev/null 2>&1 || fail "Этот скрипт нужно запускать внутри Termux."
 
-say "Обновление Termux"
+say "1/9. Обновление Termux"
 pkg update -y
 pkg upgrade -y
 
-say "Установка базовых зависимостей"
-pkg install -y git python clang cmake make curl
+say "2/9. Установка базовых зависимостей"
+pkg install -y git python clang cmake make curl coreutils
 
-say "Проверка Library-"
+say "3/9. Проверка Library-"
 if [ -d "$REPO_DIR/.git" ]; then
-    git -C "$REPO_DIR" pull --ff-only || fail "Не удалось обновить Library-. Сначала проверьте git -C '$REPO_DIR' status."
+    git -C "$REPO_DIR" pull --ff-only || fail "Не удалось обновить Library-. Проверьте git -C '$REPO_DIR' status."
 else
     if [ -e "$REPO_DIR" ]; then
-        fail "$REPO_DIR уже существует, но это не Git-репозиторий. Не удаляйте его автоматически. Проверьте содержимое вручную."
+        fail "$REPO_DIR уже существует, но это не Git-репозиторий. Удалять его автоматически нельзя."
     fi
     git clone "$REPO_URL" "$REPO_DIR"
 fi
 
-say "Проверка llama-cli"
+say "4/9. Проверка llama-cli"
 if command -v llama-cli >/dev/null 2>&1; then
     echo "llama-cli уже установлен: $(command -v llama-cli)"
 else
-    say "Попытка установки пакета llama-cpp"
     if pkg search llama-cpp >/dev/null 2>&1; then
         pkg install -y llama-cpp || true
     fi
 fi
 
 if ! command -v llama-cli >/dev/null 2>&1; then
-    say "Сборка llama.cpp внутри Termux"
+    say "Сборка llama.cpp"
     if [ -d "$LLAMA_SRC/.git" ]; then
         git -C "$LLAMA_SRC" pull --ff-only
     elif [ -e "$LLAMA_SRC" ]; then
-        fail "$LLAMA_SRC уже существует, но это не Git-репозиторий. Удалять его автоматически нельзя."
+        fail "$LLAMA_SRC существует, но это не Git-репозиторий. Удалять его автоматически нельзя."
     else
         git clone --depth=1 https://github.com/ggml-org/llama.cpp.git "$LLAMA_SRC"
     fi
@@ -67,11 +66,11 @@ if ! command -v llama-cli >/dev/null 2>&1; then
         -DLLAMA_BUILD_EXAMPLES=ON
 
     cmake --build "$LLAMA_SRC/build" --config Release --target llama-cli -j 2
-    test -x "$LLAMA_SRC/build/bin/llama-cli" || fail "Сборка завершилась, но llama-cli не найден."
+    test -x "$LLAMA_SRC/build/bin/llama-cli" || fail "Сборка llama.cpp завершилась, но llama-cli не найден."
     install -m 755 "$LLAMA_SRC/build/bin/llama-cli" "$BIN_DIR/llama-cli"
 fi
 
-say "Подготовка каталога модели"
+say "5/9. Подготовка каталога модели"
 mkdir -p "$MODEL_DIR" "$CACHE_DIR"
 
 verify_model() {
@@ -81,44 +80,61 @@ verify_model() {
     [ "$actual" = "$EXPECTED_SHA256" ]
 }
 
+quarantine_model() {
+    local src="$1"
+    local dst="${src}.broken.$(date +%Y%m%d-%H%M%S)"
+    echo "Сохраняю неполный/повреждённый файл как: $dst"
+    mv "$src" "$dst"
+}
+
 if [ -s "$MODEL_PATH" ]; then
     say "Проверка существующей модели"
     if verify_model "$MODEL_PATH"; then
         echo "Модель корректна: $MODEL_PATH"
     else
-        BROKEN_PATH="${MODEL_PATH}.broken.$(date +%Y%m%d-%H%M%S)"
-        echo "Существующий GGUF не совпадает с контрольной суммой. Сохраняю его как: $BROKEN_PATH"
-        mv "$MODEL_PATH" "$BROKEN_PATH"
+        quarantine_model "$MODEL_PATH"
     fi
 fi
 
+if [ -s "$PART_PATH" ]; then
+    say "Найдена незавершённая загрузка"
+    echo "Временный файл: $PART_PATH"
+    echo "Проверю его после продолжения загрузки."
+fi
+
 if [ ! -s "$MODEL_PATH" ]; then
-    say "Загрузка Qwen2.5-Coder-3B-Instruct Q4_K_M"
+    say "6/9. Загрузка Qwen2.5-Coder-3B-Instruct Q4_K_M"
     echo "Целевой файл: $MODEL_PATH"
-    echo "SHA256 оригинального файла Qwen: $EXPECTED_SHA256"
-    echo "Не вводите имя модели как команду. Установщик скачивает .gguf сам."
+    echo "SHA256: $EXPECTED_SHA256"
+    echo "Название модели не является командой Termux."
 
     if [ -s "$PART_PATH" ]; then
-        echo "Продолжаем незавершённую загрузку: $PART_PATH"
+        curl -L --fail --retry 5 --retry-delay 3 --continue-at - \
+            -o "$PART_PATH" \
+            "$MODEL_URL" || true
+    else
+        curl -L --fail --retry 5 --retry-delay 3 \
+            -o "$PART_PATH" \
+            "$MODEL_URL" || true
     fi
 
-    curl -L --fail --retry 5 --retry-delay 3 --continue-at - \
-        -o "$PART_PATH" \
-        "$MODEL_URL"
-
     if ! verify_model "$PART_PATH"; then
-        echo "SHA256 загруженного файла не совпадает. Начинаю чистую загрузку."
-        rm -f "$PART_PATH"
+        if [ -s "$PART_PATH" ]; then
+            quarantine_model "$PART_PATH"
+        fi
+        echo "Первая загрузка не прошла SHA256. Выполняю чистую загрузку."
         curl -L --fail --retry 5 --retry-delay 3 \
             -o "$PART_PATH" \
             "$MODEL_URL"
     fi
 
-    verify_model "$PART_PATH" || fail "Файл модели скачан, но SHA256 не совпадает. Это нерабочая/неполная загрузка. Повторите установку; Library- удалять не нужно."
+    verify_model "$PART_PATH" || fail "GGUF не прошёл SHA256. Интернет-загрузка неполна или повреждена. Повторите install_termux.sh; Library- удалять не нужно."
     mv "$PART_PATH" "$MODEL_PATH"
 fi
 
-say "Настройка пути модели"
+verify_model "$MODEL_PATH" || fail "Модель отсутствует или не соответствует контрольной SHA256."
+
+say "7/9. Настройка config.py"
 python - "$REPO_DIR/agent_system/config.py" "$MODEL_FILE" <<'PY'
 from pathlib import Path
 import re
@@ -130,11 +146,11 @@ text = config.read_text(encoding="utf-8")
 replacement = f'MODEL_PATH = Path.home() / "models" / "{model_file}"'
 text, count = re.subn(r'^MODEL_PATH\s*=.*$', replacement, text, flags=re.MULTILINE)
 if count != 1:
-    raise SystemExit("Не удалось автоматически настроить MODEL_PATH в config.py")
+    raise SystemExit("Не удалось настроить MODEL_PATH в config.py")
 config.write_text(text, encoding="utf-8")
 PY
 
-say "Проверка llama.cpp и Qwen"
+say "8/9. Проверка Qwen"
 python --version
 llama-cli --version
 if ! llama-cli \
@@ -144,22 +160,22 @@ if ! llama-cli \
     -p "Ответь одним словом: готов" \
     >"$TEST_OUT" 2>"$TEST_ERR"; then
     cat "$TEST_ERR" >&2 || true
-    fail "Qwen не запустился. Если SHA256 совпадает, смотрите ошибку выше: это уже проблема запуска или памяти, а не повреждённого файла."
+    fail "Qwen не запустился. SHA256 корректна, поэтому проблема уже в runtime, совместимости GGUF или памяти."
 fi
 cat "$TEST_OUT"
 
-say "Проверка Python-файлов агентов"
+say "9/9. Проверка Python-агентов"
 cd "$REPO_DIR/agent_system"
 python -m py_compile config.py llm.py tools.py agents.py run_agent.py
 
 cat <<EOF
 
-Установка завершена.
+=== Установка завершена ===
 
 Library-:
   $REPO_DIR
 
-Модель:
+Qwen GGUF:
   $MODEL_PATH
 
 SHA256:
@@ -171,14 +187,17 @@ llama-cli:
 Игровой проект по умолчанию:
   ${HOME}/Game
 
+Следующая проверка:
+  cd "$REPO_DIR/agent_system"
+  python -c 'from config import MODEL_PATH; print(MODEL_PATH); print(MODEL_PATH.exists())'
+
 Запуск агента:
   cd "$REPO_DIR/agent_system"
-  python run_agent.py "Добавь небольшое изменение в игру и запусти тесты"
+  python run_agent.py "Проверь проект игры"
 
-Важно:
+ВАЖНО:
   - API-ключ не используется.
-  - После загрузки модели inference выполняется локально.
-  - Существующие файлы Library- этим скриптом не удаляются.
-  - Повреждённая модель сохраняется с суффиксом .broken.<дата>, а не удаляется.
-  - Не вводите "Qwen2.5-Coder-3B-Instruct Q4_K_M" как команду: это название модели, а не команда Termux.
+  - Qwen работает локально.
+  - Повреждённые файлы сохраняются как .broken.<дата>, а не удаляются.
+  - Не вводите "Qwen2.5-Coder-3B-Instruct Q4_K_M" как команду.
 EOF
