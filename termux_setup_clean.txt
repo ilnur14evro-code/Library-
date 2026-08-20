@@ -1,0 +1,416 @@
+НАСТРОЙКА ЧИСТОГО TERMUX БЕЗ УСТАНОВКИ ПАКЕТОВ
+Проверено по актуальным исходникам Termux.
+
+Цель:
+- удобная клавиатура для программирования и ASCII-игр;
+- удобный Bash;
+- никаких pkg install / pkg update;
+- все изменения делаются файлами и уже имеющимися командами.
+
+ВАЖНО
+Не вставляй всё одним блоком. Сначала выполни команды создания файлов, затем вставь содержимое файлов.
+
+==================================================
+1. TERMUX: ~/.termux/termux.properties
+==================================================
+
+Создать каталог:
+
+mkdir -p ~/.termux
+
+Открыть файл:
+
+nano ~/.termux/termux.properties
+
+Вставить:
+
+fullscreen = true
+
+terminal-cursor-style = block
+terminal-cursor-blink-rate = 500
+
+terminal-transcript-rows = 10000
+
+terminal-margin-horizontal = 2
+terminal-margin-vertical = 0
+
+extra-keys-style = default
+
+extra-keys = [ \
+['ESC','TAB','CTRL','ALT','HOME','UP','END','PGUP'], \
+['/','-','LEFT','DOWN','RIGHT','PGDN','ENTER','KEYBOARD'] \
+]
+
+bell-character = ignore
+
+terminal-onclick-url-open = true
+
+Сохранить:
+Ctrl+O
+Enter
+
+Выйти:
+Ctrl+X
+
+Применить без перезапуска:
+
+termux-reload-settings
+
+
+ПРИМЕЧАНИЕ:
+Extra keys могут быть скрыты. В Termux их можно включить долгим нажатием
+на кнопку клавиатуры в drawer либо сочетанием Volume-Down + K.
+
+==================================================
+2. ЕСЛИ БУДЕТ ПРОБЛЕМА С КЛАВИАТУРОЙ SAMSUNG
+==================================================
+
+Для Samsung Termux имеет специальную настройку:
+
+enforce-char-based-input = true
+
+На Honor без проблемы её добавлять не нужно.
+
+Эта настройка официально предназначена для случаев, когда сенсорная
+клавиатура передаёт символы только после пробела/Enter или выбирает
+неправильную раскладку.
+
+==================================================
+3. ДОПОЛНИТЕЛЬНЫЕ TERMUX SHORTCUTS
+==================================================
+
+Можно добавить в termux.properties:
+
+shortcut.create-session = ctrl + t
+shortcut.next-session = ctrl + tab
+shortcut.previous-session = ctrl + shift + tab
+
+Это позволяет работать с несколькими сессиями через клавиатуру.
+
+Если комбинация неудобна или конфликтует с клавиатурой, строки можно удалить.
+
+==================================================
+4. BASH: ~/.bashrc
+==================================================
+
+Открыть:
+
+nano ~/.bashrc
+
+Добавить:
+
+# ===== HISTORY =====
+
+HISTSIZE=10000
+HISTFILESIZE=20000
+HISTCONTROL=ignoredups
+shopt -s histappend
+
+
+# ===== PROMPT =====
+
+PS1='\u@\h:\w\$ '
+
+
+# ===== NAVIGATION =====
+
+alias ll='ls -lah'
+alias la='ls -A'
+alias ..='cd ..'
+alias ...='cd ../..'
+alias c='clear'
+
+
+# ===== SAFER FILE OPERATIONS =====
+
+alias cp='cp -i'
+alias mv='mv -i'
+alias rm='rm -i'
+
+
+# ===== TERMUX / SHELL INFORMATION =====
+
+alias info='termux-info'
+alias commands='compgen -c | sort -u'
+alias builtins='compgen -b | sort -u'
+
+
+# ===== EXPERIMENT DIRECTORY =====
+
+mkdir -p "$HOME/experiments"/{ascii,shell,terminal,android,tests}
+
+exp() {
+    cd "$HOME/experiments" || return
+}
+
+
+# ===== CREATE DIRECTORY AND ENTER IT =====
+
+mkcd() {
+    mkdir -p "$1" && cd "$1"
+}
+
+
+# ===== CHECK WHETHER COMMANDS EXIST =====
+
+where() {
+    for cmd in "$@"; do
+        printf '%-20s : ' "$cmd"
+        command -v "$cmd" || echo "нет"
+    done
+}
+
+
+# ===== SHOW CURRENT ENVIRONMENT =====
+
+showenv() {
+    echo "===== SHELL ====="
+    echo "$SHELL"
+    echo
+    echo "===== BASH ====="
+    echo "$BASH_VERSION"
+    echo
+    echo "===== HOME ====="
+    echo "$HOME"
+    echo
+    echo "===== PREFIX ====="
+    echo "$PREFIX"
+    echo
+    echo "===== PATH ====="
+    echo "$PATH"
+}
+
+
+# ===== SHOW ALL COMMAND NAMES =====
+
+cmds() {
+    compgen -c | sort -u
+}
+
+
+# ===== SHOW BASH BUILTINS =====
+
+builtins() {
+    compgen -b | sort -u
+}
+
+
+# ===== EXTRACT COMMON ARCHIVES =====
+
+extract() {
+    case "$1" in
+        *.tar) tar -xf "$1" ;;
+        *.tar.gz|*.tgz) tar -xzf "$1" ;;
+        *.tar.xz) tar -xJf "$1" ;;
+        *.tar.bz2) tar -xjf "$1" ;;
+        *.zip) unzip "$1" ;;
+        *) echo "Неизвестный архив" ;;
+    esac
+}
+
+После сохранения:
+
+source ~/.bashrc
+
+
+==================================================
+5. ПРОВЕРКА TERMUX
+==================================================
+
+Выполни:
+
+termux-info
+
+Проверить настройки:
+
+cat ~/.termux/termux.properties
+
+Проверить Bash:
+
+echo "$BASH_VERSION"
+
+Проверить окружение:
+
+showenv
+
+Проверить наличие инструментов:
+
+where bash awk sed grep curl nano
+
+Показать builtins:
+
+builtins
+
+Показать все доступные имена команд:
+
+cmds
+
+
+==================================================
+6. ВАЖНО: ЧТО ИМЕННО МЫ НАСТРОИЛИ
+==================================================
+
+termux.properties
+    внешний вид Termux
+    полноэкранный режим
+    курсор
+    scrollback
+    поля терминала
+    extra keys
+    звук bell
+    ссылки
+    переключение сессий
+
+.bashrc
+    история
+    prompt
+    aliases
+    функции
+    каталоги экспериментов
+    проверка команд
+    информация о среде
+
+
+==================================================
+7. ДЛЯ ASCII-ИГРЫ
+==================================================
+
+Extra keys дают:
+
+ESC TAB CTRL ALT HOME UP END PGUP
+/   -   LEFT DOWN RIGHT PGDN ENTER KEYBOARD
+
+Для игры особенно полезны:
+
+UP
+DOWN
+LEFT
+RIGHT
+ESC
+ENTER
+CTRL
+ALT
+
+Позже можно сделать отдельную раскладку с:
+
+W A S D
+SPACE
+ENTER
+ESC
+стрелками
+
+Также Bash уже предоставляет:
+
+read
+printf
+while
+for
+case
+if
+test
+массивы
+арифметику
+функции
+$RANDOM
+
+А из внешних программ в твоём чистом Termux есть, среди прочего:
+
+awk
+sed
+grep
+cut
+tr
+sort
+uniq
+find
+xargs
+sleep
+clear
+stty
+ps
+kill
+
+Это достаточно мощная база для ASCII-игры без установки дополнительных пакетов.
+
+
+==================================================
+8. ЧЕГО НЕ НАДО СЕЙЧАС ДЕЛАТЬ
+==================================================
+
+Не устанавливать:
+
+pkg install ...
+
+Не обновлять:
+
+pkg update
+
+Не устанавливать zsh/tmux/fzf и другие дополнительные инструменты,
+пока мы изучаем возможности чистого Termux.
+
+==================================================
+9. ОФИЦИАЛЬНЫЕ ПРОВЕРЕННЫЕ ПАРАМЕТРЫ
+==================================================
+
+Поддерживаются:
+
+fullscreen
+use-fullscreen-workaround
+terminal-cursor-blink-rate
+terminal-cursor-style
+terminal-margin-horizontal
+terminal-margin-vertical
+terminal-transcript-rows
+extra-keys
+extra-keys-style
+extra-keys-text-all-caps
+bell-character
+terminal-onclick-url-open
+hide-soft-keyboard-on-startup
+soft-keyboard-toggle-behaviour
+volume-keys
+enforce-char-based-input
+ctrl-space-workaround
+default-working-directory
+shortcut.create-session
+shortcut.next-session
+shortcut.previous-session
+shortcut.rename-session
+
+Не нужно добавлять в файл неизвестные параметры из случайных
+инструкций в интернете.
+
+==================================================
+10. ПОЛЕЗНЫЕ КОМАНДЫ ПОСЛЕ НАСТРОЙКИ
+==================================================
+
+source ~/.bashrc
+
+termux-reload-settings
+
+showenv
+
+where bash awk sed grep curl nano
+
+builtins
+
+cmds
+
+exp
+
+==================================================
+11. СТРУКТУРА
+==================================================
+
+$HOME/
+├── .bashrc
+├── .termux/
+│   └── termux.properties
+└── experiments/
+    ├── ascii/
+    ├── shell/
+    ├── terminal/
+    ├── android/
+    └── tests/
+
+Это всё можно создать без установки дополнительных пакетов.
